@@ -21,11 +21,17 @@ import kotlin.math.roundToInt
 enum class CalibMode { CANCEL, SWIPE }
 
 /**
- * 定位器校准浮层 —— 极简白色版
+ * 定位器校准浮层 —— 极简版
  *
- * 窗口组成：
- *  1. 控制面板（固定宽度，可拖动，初始在屏幕左侧偏上）
- *  2. 圆形定位按钮（1 或 2 个，默认穿透）
+ * 界面组成（仅两个元素，不覆盖全屏）：
+ *  1. 贴边控制面板（宽 80dp，高 ~90dp，可拖动）
+ *     - 标题 + × 关闭
+ *     - 「确定位置」按钮 → 保存并退出
+ *  2. 圆形定位按钮（直径 32dp，直接可拖，默认穿透）
+ *     - CANCEL: 1 个按钮 ✓
+ *     - SWIPE: 2 个按钮 1→2，中间画指示连线
+ *
+ * 定位按钮默认 FLAG_NOT_TOUCHABLE 穿透，点面板「拖动」切换为可触摸。
  */
 class CalibrationService(
     private val context: Context,
@@ -38,7 +44,6 @@ class CalibrationService(
 
     private var panelView: View? = null
     private var dragToggleBtn: TextView? = null
-    private var statusTv: TextView? = null
     private var editMode = false
 
     private val pointViews = mutableMapOf<Target, PointView>()
@@ -51,11 +56,8 @@ class CalibrationService(
     private enum class Target { CANCEL, START, END }
     private var dragging: Target? = null
 
-    /** 定位按钮直径 */
-    private val btnSize = (36 * dp).roundToInt()
-    /** 面板固定宽高 */
-    private val panelW = (96 * dp).roundToInt()
-    private val panelH = (116 * dp).roundToInt()
+    private val btnSize = (32 * dp).roundToInt()
+    private val panelW = (82 * dp).roundToInt()
 
     // ===================== 对外 =====================
 
@@ -89,19 +91,8 @@ class CalibrationService(
         onFinish(true)
     }
 
-    // ===================== 屏幕尺寸（用 context 而非 Resources.getSystem） =====================
-
-    private fun screenWidth(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            context.resources.displayMetrics.widthPixels
-        } else {
-            context.resources.displayMetrics.widthPixels
-        }
-    }
-
-    private fun screenHeight(): Int {
-        return context.resources.displayMetrics.heightPixels
-    }
+    private fun screenWidth() = context.resources.displayMetrics.widthPixels
+    private fun screenHeight() = context.resources.displayMetrics.heightPixels
 
     // ===================== 窗口参数 =====================
 
@@ -113,7 +104,6 @@ class CalibrationService(
             format = PixelFormat.TRANSLUCENT
             gravity = Gravity.TOP or Gravity.START
             this.x = x; this.y = y
-            // 不用 FLAG_LAYOUT_NO_LIMITS，避免 ROM 异常扩展
             flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     if (touchable) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -126,7 +116,7 @@ class CalibrationService(
         private var startLX = 0; private var startLY = 0
         private var touchX = 0f; private var touchY = 0f
         private var draggingPanel = false
-        private val touchSlop = 6 * dp
+        private val slop = 6 * dp
 
         override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
             when (ev.actionMasked) {
@@ -138,9 +128,9 @@ class CalibrationService(
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!draggingPanel) {
-                        val dx = kotlin.math.abs(ev.rawX - touchX)
-                        val dy = kotlin.math.abs(ev.rawY - touchY)
-                        if (dx > touchSlop || dy > touchSlop) draggingPanel = true
+                        if (kotlin.math.abs(ev.rawX - touchX) > slop ||
+                            kotlin.math.abs(ev.rawY - touchY) > slop)
+                            draggingPanel = true
                     }
                     if (draggingPanel) return true
                 }
@@ -172,79 +162,61 @@ class CalibrationService(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             background = GradientDrawable().apply {
-                cornerRadius = 14 * dp
+                cornerRadius = 12 * dp
                 setColor(Color.parseColor("#F0FFFFFF"))
                 setStroke((1 * dp).toInt(), Color.parseColor("#20000000"))
             }
-            setPadding((7 * dp).toInt(), (7 * dp).toInt(), (7 * dp).toInt(), (7 * dp).toInt())
+            setPadding((6 * dp).toInt(), (6 * dp).toInt(), (6 * dp).toInt(), (6 * dp).toInt())
         }
 
-        // 标题 + 关闭
+        // 标题行
         val titleRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val titleTv = TextView(context).apply {
-            text = if (mode == CalibMode.CANCEL) "取消" else "滑动"
+        titleRow.addView(TextView(context).apply {
+            text = if (mode == CalibMode.CANCEL) "定位" else "滑动"
             setTextColor(Color.parseColor("#333333")); textSize = 10f
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val closeTv = TextView(context).apply {
-            text = "×"; setTextColor(Color.parseColor("#FF5252")); textSize = 14f
+        })
+        titleRow.addView(TextView(context).apply {
+            text = "×"; setTextColor(Color.parseColor("#FF5252")); textSize = 13f
             gravity = Gravity.CENTER
             setOnClickListener { dismiss(); onFinish(false) }
-        }
-        titleRow.addView(titleTv)
-        titleRow.addView(closeTv, LinearLayout.LayoutParams((22 * dp).toInt(), (22 * dp).toInt()))
+        }, LinearLayout.LayoutParams((20 * dp).toInt(), (20 * dp).toInt()))
         panel.addView(titleRow)
 
-        // 状态
-        statusTv = TextView(context).apply {
-            text = "穿透中"
-            setTextColor(Color.parseColor("#999999")); textSize = 8f
-            setPadding(0, (2 * dp).toInt(), 0, (3 * dp).toInt())
-        }
-        panel.addView(statusTv)
-
-        // 分隔线
-        panel.addView(View(context).apply {
-            setBackgroundColor(Color.parseColor("#15000000"))
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (0.5f * dp).toInt()).apply {
-            bottomMargin = (5 * dp).toInt()
-        })
-
-        // 拖动按钮
+        // 拖动切换按钮
         dragToggleBtn = TextView(context).apply {
             text = "拖动"
-            setTextColor(Color.parseColor("#333333")); textSize = 11f; gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#333333")); textSize = 10f; gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = 10 * dp
-                setColor(Color.parseColor("#E8E8E8"))
+                cornerRadius = 8 * dp
+                setColor(Color.parseColor("#E0E0E0"))
             }
             setOnClickListener { toggleEditMode() }
         }
         panel.addView(dragToggleBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, (28 * dp).toInt()
-        ).apply { bottomMargin = (5 * dp).toInt() })
+            LinearLayout.LayoutParams.MATCH_PARENT, (24 * dp).toInt()
+        ).apply { topMargin = (4 * dp).toInt(); bottomMargin = (4 * dp).toInt() })
 
-        // 确认按钮
+        // 确定按钮
         panel.addView(TextView(context).apply {
-            text = "✓"
-            setTextColor(Color.parseColor("#333333")); textSize = 11f; gravity = Gravity.CENTER
+            text = "确定位置"
+            setTextColor(Color.WHITE); textSize = 10f; gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = 10 * dp
-                setColor(Color.parseColor("#E8E8E8"))
+                cornerRadius = 8 * dp
+                setColor(Color.parseColor("#333333"))
             }
             setOnClickListener { saveAndExit() }
         }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, (28 * dp).toInt()
+            LinearLayout.LayoutParams.MATCH_PARENT, (24 * dp).toInt()
         ))
 
         panelView = panel
-        // 面板初始位置：屏幕左侧偏上
         val initX = (4 * dp).toInt()
-        val initY = (screenHeight() - panelH) / 2
-        val lp = overlayParams(panelW, panelH, initX, initY, touchable = true)
+        val initY = (screenHeight() / 3)
+        val lp = overlayParams(panelW, WindowManager.LayoutParams.WRAP_CONTENT, initX, initY, touchable = true)
         panelLp = lp
         addView(panel, lp, "panel")
     }
@@ -267,7 +239,7 @@ class CalibrationService(
         addView(view, lp, "point-$target")
     }
 
-    private fun currentRatio(t: Target): Pair<Float, Float> = when (t) {
+    private fun currentRatio(t: Target) = when (t) {
         Target.CANCEL -> cancelX to cancelY
         Target.START  -> startX  to startY
         Target.END    -> endX    to endY
@@ -296,11 +268,9 @@ class CalibrationService(
         dragToggleBtn?.text = if (editMode) "完成" else "拖动"
         dragToggleBtn?.let {
             (it.background as? GradientDrawable)?.setColor(
-                if (editMode) Color.parseColor("#FFE0B2") else Color.parseColor("#E8E8E8")
+                if (editMode) Color.parseColor("#FFE0B2") else Color.parseColor("#E0E0E0")
             )
         }
-        statusTv?.text = if (editMode) "拖动中" else "穿透中"
-
         pointViews.forEach { (t, v) ->
             val lp = pointLps[t] ?: return@forEach
             lp.flags = if (editMode)
@@ -315,9 +285,7 @@ class CalibrationService(
     // ===================== 定位按钮视图 =====================
 
     @SuppressLint("ViewConstructor")
-    private inner class PointView(
-        ctx: Context, private val target: Target
-    ) : View(ctx) {
+    private inner class PointView(ctx: Context, private val target: Target) : View(ctx) {
 
         private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
         private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -330,34 +298,33 @@ class CalibrationService(
 
         override fun onDraw(c: Canvas) {
             val cx = width / 2f; val cy = height / 2f
-            val radius = width / 2f
+            val r = width / 2f
 
-            // SWIPE 连线
             if (mode == CalibMode.SWIPE) drawConnection(c, cx, cy)
 
-            // 阴影圈
-            ring.color = Color.parseColor("#18000000")
+            // 阴影
+            ring.color = Color.parseColor("#15000000")
             ring.strokeWidth = 1f * dp
-            c.drawCircle(cx, cy + 1f * dp, radius - 1f * dp, ring)
+            c.drawCircle(cx, cy + 1f * dp, r - 1f * dp, ring)
 
             // 白色主体
-            fill.color = if (editMode) Color.WHITE else Color.parseColor("#F0F0F0")
-            c.drawCircle(cx, cy, radius - 2f * dp, fill)
+            fill.color = if (editMode) Color.WHITE else Color.parseColor("#E8E8E8")
+            c.drawCircle(cx, cy, r - 2f * dp, fill)
 
             // 深灰描边
             ring.color = Color.parseColor("#333333")
             ring.strokeWidth = if (dragging == target) 2.5f * dp else 1.5f * dp
-            ring.alpha = if (editMode) 255 else 130
-            c.drawCircle(cx, cy, radius - 2f * dp, ring)
+            ring.alpha = if (editMode) 255 else 120
+            c.drawCircle(cx, cy, r - 2f * dp, ring)
 
             // 数字
-            txt.textSize = 12f * dp
+            txt.textSize = 11f * dp
             val label = when (target) {
                 Target.CANCEL -> "✓"
                 Target.START -> "1"
                 Target.END -> "2"
             }
-            c.drawText(label, cx, cy + 4f * dp, txt)
+            c.drawText(label, cx, cy + 3.5f * dp, txt)
         }
 
         private fun drawConnection(c: Canvas, cx: Float, cy: Float) {
@@ -374,13 +341,13 @@ class CalibrationService(
             val localY = otherCy - myCy + cy
 
             line.color = if (dragging != null) Color.parseColor("#AA333333")
-                         else Color.parseColor("#55333333")
+                         else Color.parseColor("#50333333")
             line.strokeWidth = if (dragging != null) 2f * dp else 1.2f * dp
             c.drawLine(cx, cy, localX, localY, line)
 
             fill.color = Color.parseColor("#333333")
-            fill.alpha = if (dragging != null) 200 else 80
-            c.drawCircle(localX, localY, 3.5f * dp, fill)
+            fill.alpha = if (dragging != null) 180 else 70
+            c.drawCircle(localX, localY, 3f * dp, fill)
             fill.alpha = 255
         }
 
@@ -428,7 +395,5 @@ class CalibrationService(
         pointViews.values.forEach { it.invalidate() }
     }
 
-    companion object {
-        private const val TAG = "CalibService"
-    }
+    companion object { private const val TAG = "CalibService" }
 }
