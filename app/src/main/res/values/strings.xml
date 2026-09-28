@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">体力小助手</string>
+    <string name="accessibility_service_description">体力小助手无障碍服务，用于模拟滑动手势引出游戏退出弹窗，以实现体力自动回复。</string>
+</resources>
