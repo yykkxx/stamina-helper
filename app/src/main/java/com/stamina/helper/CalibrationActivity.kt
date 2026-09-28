@@ -192,10 +192,10 @@ fun CalibrationScreen(
             // ===== 说明 =====
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 SectionTitle("怎么用", modifier = Modifier.padding(bottom = 10.dp))
-                StepRow("1", "点「开始校准」，浮层出现并自动回到桌面")
-                StepRow("2", "打开游戏，引出退出弹窗")
-                StepRow("3", "点右侧「开始拖动」，把圆形按钮拖到目标位置")
-                StepRow("4", "点「完成拖动」，再点「✓ 确认位置」保存")
+                StepRow("1", "点「开始校准」，浮层出现并回到桌面")
+                StepRow("2", "打开原神，引出退出弹窗")
+                StepRow("3", "点面板「拖动」→ 圆形按钮变可拖动")
+                StepRow("4", "拖到目标位置 → 点「完成」→ 点「确定位置」")
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
@@ -205,7 +205,7 @@ fun CalibrationScreen(
                         .padding(11.dp)
                 ) {
                     Text(
-                        "滑动定位有两个按钮：1 拖到起点，2 拖到终点。面板本身可随意拖动位置。",
+                        "滑动定位有 1 和 2 两个按钮：1 拖到起点，2 拖到终点，中间有指示线。面板可随意拖动。",
                         fontSize = 11.5.sp, maxLines = 3,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
