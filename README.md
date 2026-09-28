@@ -1,29 +1,50 @@
-# 体力小助手 Stamina Helper
+# 薇斯纳体力小助手 Weisina Helper
 
-> Android 游戏体力自动回复助手 · 自动滑出退出弹窗 · 倒计时 · 循环执行
+> 专为原神薇斯纳角色设计的体力恢复辅助工具
 
-## 功能简介
+## 这是什么？
 
-在游戏（如原神）中自动执行滑动操作呼出退出弹窗，倒计时后自动点击取消按钮回到游戏，实现体力回复的自动化循环。
+在原神中，薇斯纳角色的体力可以通过特定操作恢复：**从屏幕边缘滑出游戏退出弹窗 → 等待倒计时 → 点击取消按钮回到游戏**，即可恢复体力。本应用将这个流程自动化。
 
-### 核心功能
+### 体力恢复原理
 
-- **自动滑动**：从屏幕边缘滑出游戏退出弹窗，可配置滑动时长
+原神的退出弹窗（暂停菜单）会"冻结"游戏内部计时器，但角色的体力恢复计时仍在运行。具体流程：
+
+1. **滑动** — 从屏幕边缘滑动，呼出退出弹窗（暂停游戏）
+2. **等待** — 在弹窗显示期间，薇斯纳的体力会随时间恢复
+3. **取消** — 点击弹窗上的「取消」按钮，回到游戏
+4. **循环** — 可选：重复以上步骤，直到体力回满
+
+本助手自动执行这个流程，你只需要启动悬浮窗，剩下的交给它。
+
+## 功能
+
+- **自动滑动**：模拟从屏幕边缘滑出退出弹窗
 - **倒计时回复**：设置等待时间（秒），倒计时结束后自动操作
-- **两种执行模式**：Root 模式（`input` 命令） / 无障碍模式（AccessibilityService）
+- **两种执行模式**：Root（`input` 命令）/ 无障碍（AccessibilityService）
 - **自动动作模式**：
-  - 关闭：全程手动
-  - 仅点取消：滑动→倒计时→点击取消，结束
-  - 循环：滑动→倒计时→点取消→等待→再滑动…（可设置轮数上限与间隔）
-- **定位器校准**：在游戏中通过可拖动悬浮窗精确定位「取消按钮」和「前进键拖拽路径」，坐标归一化存储，换设备仍有效
-- **悬浮窗控制**：桌面悬浮窗实时显示状态（就绪/倒计时/循环），支持开始/停止
+  - 关闭 — 全程手动
+  - 仅点取消 — 滑动→倒计时→点击取消，结束
+  - 循环 — 滑动→倒计时→点取消→等待→再滑动…（可设轮数上限与间隔）
+- **定位器校准**：在原神中通过可拖动悬浮窗精确定位「取消按钮」和「前进键拖拽路径」
+- **悬浮窗控制**：桌面悬浮窗实时显示状态，支持开始/停止
 
-### 技术特点
+### 定位器设计
 
-- **连点器式穿透架构**：定位器浮层使用 `FLAG_NOT_TOUCHABLE`，触摸事件 100% 穿透到游戏
-- **极简悬浮窗**：贴边可拖动控制面板 + 圆形定位按钮，不遮挡游戏画面
-- **白色主题**：简洁的灰白配色，Material 3 风格
-- **Compose UI**：全 Jetpack Compose 构建，Glassmorphism 玻璃拟态组件
+定位器浮层只有两个元素，**不覆盖全屏**：
+
+| 元素 | 说明 |
+|------|------|
+| 贴边控制面板（82dp 宽） | 可拖动，含「拖动」切换按钮 + 「确定位置」按钮 |
+| 圆形定位按钮（32dp） | 取消模式 1 个 ✓ 按钮；滑动模式 1 和 2 两个按钮，中间有指示连线 |
+
+**使用流程：**
+1. 点「开始校准」→ 浮层出现，自动回到桌面
+2. 打开原神，引出退出弹窗
+3. 点面板「拖动」→ 圆形按钮变可拖
+4. 拖到目标位置 → 点「完成」→ 点「确定位置」保存
+
+定位按钮默认 `FLAG_NOT_TOUCHABLE`，触摸事件 100% 穿透到游戏，不影响操作。
 
 ## 项目结构
 
@@ -32,49 +53,31 @@ app/src/main/java/com/stamina/helper/
 ├── MainActivity.kt              # 主界面
 ├── CalibrationActivity.kt        # 定位器校准页面
 ├── calibration/
-│   └── CalibrationService.kt     # 校准悬浮窗服务
-├── floating/
-│   ├── FloatingWindowManager.kt  # 悬浮窗视图管理
-│   └── FloatingState.kt         # 悬浮窗状态定义
-├── service/
-│   ├── FloatingWindowService.kt  # 悬浮窗前台服务
-│   └── StaminaAccessibilityService.kt  # 无障碍服务
-├── gesture/
-│   ├── GestureExecutor.kt        # 手势执行接口
-│   ├── RootGestureExecutor.kt    # Root 模式实现
-│   ├── AccessibilityGestureExecutor.kt  # 无障碍模式实现
-│   └── GestureConfig.kt          # 手势配置
-├── timer/
-│   └── StaminaTimer.kt          # 倒计时器
-├── root/
-│   └── RootChecker.kt            # Root 权限检测
-├── prefs/
-│   └── AppPreferences.kt         # 偏好设置管理
-└── ui/
-    ├── theme/                     # Material 3 主题
-    └── components/                # 玻璃拟态组件
+│   └── CalibrationService.kt     # 校准悬浮窗（极简，不覆盖全屏）
+├── floating/                     # 悬浮窗视图管理
+├── service/                      # 前台服务 + 无障碍服务
+├── gesture/                      # 手势执行（Root / 无障碍）
+├── timer/                        # 倒计时器
+├── root/                         # Root 权限检测
+├── prefs/                        # 偏好设置
+└── ui/                           # 主题 + 组件
 ```
 
 ## 构建
 
 ```bash
-# 环境要求
-# - Android SDK 35
-# - JDK 17
-# - Gradle 9.x
-
 ./gradlew assembleDebug
 ```
 
 产物路径：`app/build/outputs/apk/debug/app-debug.apk`
 
-## 权限说明
+## 权限
 
 | 权限 | 用途 |
 |------|------|
-| `SYSTEM_ALERT_WINDOW` | 悬浮窗（校准浮层、状态悬浮窗） |
-| `FOREGROUND_SERVICE` | 悬浮窗前台服务保活 |
-| `POST_NOTIFICATIONS` | 前台服务通知 |
+| `SYSTEM_ALERT_WINDOW` | 悬浮窗 |
+| `FOREGROUND_SERVICE` | 前台服务保活 |
+| `POST_NOTIFICATIONS` | 服务通知 |
 | 无障碍服务 | 无障碍模式下执行手势 |
 
 ## 配置项
