@@ -1,0 +1,32 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Operit / 设备相关
+.operit/
+.backup/
+.kotlin/
+tools/
+setup_android_env.sh
+plan/
+
+# APK 产物
+*.apk
+
+# 密钥/令牌
+*.keystore
+*.jks
+*token*
+*secret*
